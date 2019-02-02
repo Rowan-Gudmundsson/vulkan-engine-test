@@ -1,5 +1,9 @@
 #include "graphics_headers.h"
 
+#define PRINT_STEP(step_desc, level)                  \
+  for (auto i = 0; i < level; i++) std::cout << "\t"; \
+  std::cout << std::string("- Doing step: ") + step_desc + "..." << std::endl;
+
 class Triangle {
  public:
   static std::vector<char> ReadFile(const std::string& file_name);
@@ -53,8 +57,14 @@ class Triangle {
   void CreateLogicalDevice();
   void CreateSwapChain();
   void CreateImageViews();
+  void CreateRenderPass();
   void CreateGraphicsPipeline();
+  void CreateFramebuffers();
+  void CreateCommandPool();
+  void CreateCommandBuffers();
+  void CreateSemaphores();
   void MainLoop();
+  void DrawFrame();
 
   GLFWwindow* m_window;
   u_int32_t m_window_width, m_window_height;
@@ -67,12 +77,21 @@ class Triangle {
 
   std::vector<vk::Image> m_swap_chain_images;
 
+  vk::CommandPool m_command_pool;
+  std::vector<vk::CommandBuffer> m_command_buffers;
+
   struct ChosenSwapChainDetails {
     vk::Format format;
     vk::Extent2D extent;
   } m_swap_chain_details;
 
   std::vector<vk::ImageView> m_swap_chain_image_views;
+
+  vk::RenderPass m_render_pass;
+  vk::PipelineLayout m_pipeline_layout;
+  vk::Pipeline m_graphics_pipeline;
+
+  std::vector<vk::Framebuffer> m_swap_chain_framebuffers;
 
 #ifdef DEV_MODE
   const bool m_enable_validation_layers = true;

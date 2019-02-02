@@ -149,8 +149,11 @@ Triangle::Triangle(u_int32_t width, uint32_t height) {
 }
 
 void Triangle::Run() {
+  PRINT_STEP("Initialize window", 0)
   InitWindow();
+  PRINT_STEP("Initialize vulkan", 0)
   InitVulkan();
+  PRINT_STEP("Main loop", 0)
   MainLoop();
 }
 
@@ -165,12 +168,30 @@ void Triangle::InitWindow() {
 }
 
 void Triangle::InitVulkan() {
+  PRINT_STEP("Create instance", 1)
   CreateInstance();
+  PRINT_STEP("Create surface", 1)
   CreateSurface();
+  PRINT_STEP("Pick physical device", 1)
   PickPhysicalDevice();
+  PRINT_STEP("Create locigal device", 1)
   CreateLogicalDevice();
+  PRINT_STEP("Create swapchain", 1)
   CreateSwapChain();
+  PRINT_STEP("Create image views", 1)
   CreateImageViews();
+  PRINT_STEP("Create render pass", 1)
+  CreateRenderPass();
+  PRINT_STEP("Create graphics pipeline", 1)
+  CreateGraphicsPipeline();
+  PRINT_STEP("Create framebuffers", 1)
+  CreateFramebuffers();
+  PRINT_STEP("Create command pool", 1)
+  CreateCommandPool();
+  PRINT_STEP("Create command buffers", 1)
+  CreateCommandBuffers();
+  PRINT_STEP("Create semaphores", 1)
+  CreateSemaphores();
 }
 
 bool Triangle::CheckValidationLayerSupport(std::string& failed_layer) {
@@ -224,10 +245,10 @@ void Triangle::CreateInstance() {
 
   glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
-  std::cout << "GLFW Extensions: " << std::endl;
-  for (int i = 0; i < glfw_extension_count; i++) {
-    std::cout << "- " << glfw_extensions[i] << std::endl;
-  }
+  // std::cout << "GLFW Extensions: " << std::endl;
+  // for (int i = 0; i < glfw_extension_count; i++) {
+  //   std::cout << "- " << glfw_extensions[i] << std::endl;
+  // }
 
   create_info.enabledExtensionCount = glfw_extension_count;
   create_info.ppEnabledExtensionNames = glfw_extensions;
@@ -396,6 +417,46 @@ void Triangle::CreateImageViews() {
   }
 }
 
+void Triangle::CreateRenderPass() {
+  vk::AttachmentDescription color_attachment = {};
+  color_attachment.format = m_swap_chain_details.format;
+  color_attachment.samples = vk::SampleCountFlagBits::e1;
+  color_attachment.loadOp = vk::AttachmentLoadOp::eClear;
+  color_attachment.storeOp = vk::AttachmentStoreOp::eStore;
+  color_attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+  color_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+  color_attachment.initialLayout = vk::ImageLayout::eUndefined;
+  color_attachment.finalLayout = vk::ImageLayout::ePresentSrcKHR;
+
+  vk::AttachmentReference color_attachment_ref = {};
+  color_attachment_ref.attachment = 0;
+  color_attachment_ref.layout = vk::ImageLayout::eColorAttachmentOptimal;
+
+  vk::SubpassDescription subpass = {};
+  subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &color_attachment_ref;
+
+  vk::SubpassDependency dependancy = {};
+  dependancy.srcSubpass = VK_SUBPASS_EXTERNAL;
+  dependancy.dstSubpass = 0;
+  dependancy.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependancy.srcAccessMask = vk::AccessFlags(0);
+  dependancy.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependancy.dstAccessMask = vk::AccessFlagBits::eColorAttachmentRead |
+                             vk::AccessFlagBits::eColorAttachmentWrite;
+
+  vk::RenderPassCreateInfo render_pass = {};
+  render_pass.attachmentCount = 1;
+  render_pass.pAttachments = &color_attachment;
+  render_pass.subpassCount = 1;
+  render_pass.pSubpasses = &subpass;
+  render_pass.dependencyCount = 1;
+  render_pass.pDependencies = &dependancy;
+
+  m_render_pass = m_device->createRenderPass(render_pass);
+}
+
 void Triangle::CreateGraphicsPipeline() {
   auto vert_shader_code = ReadFile("../shaders/vert.spv");
   auto frag_shader_code = ReadFile("../shaders/frag.spv");
@@ -437,7 +498,7 @@ void Triangle::CreateGraphicsPipeline() {
   viewport.maxDepth = 1.0f;
 
   vk::Rect2D scissor = {};
-  scissor.offset = {0, 0};
+  scissor.offset = vk::Offset2D{0, 0};
   scissor.extent = m_swap_chain_details.extent;
 
   vk::PipelineViewportStateCreateInfo viewport_state = {};
@@ -483,22 +544,196 @@ void Triangle::CreateGraphicsPipeline() {
       vk::BlendFactor::eZero;                               // Optional
   color_blend_attachment.alphaBlendOp = vk::BlendOp::eAdd;  // Optional
 
+  vk::PipelineColorBlendStateCreateInfo color_blending = {};
+  color_blending.logicOpEnable = static_cast<vk::Bool32>(false);
+  color_blending.logicOp = vk::LogicOp::eCopy;  // Optional
+  color_blending.attachmentCount = 1;
+  color_blending.pAttachments = &color_blend_attachment;
+  color_blending.blendConstants[0] = 0.0f;  // Optional
+  color_blending.blendConstants[1] = 0.0f;  // Optional
+  color_blending.blendConstants[2] = 0.0f;  // Optional
+  color_blending.blendConstants[3] = 0.0f;  // Optional
+
+  vk::DynamicState dynamic_states[] = {vk::DynamicState::eViewport,
+                                       vk::DynamicState::eLineWidth};
+
+  vk::PipelineDynamicStateCreateInfo dynamic_state = {};
+  dynamic_state.dynamicStateCount = 2;
+  dynamic_state.pDynamicStates = dynamic_states;
+
+  vk::PipelineLayoutCreateInfo pipeline_layout_info = {};
+  pipeline_layout_info.setLayoutCount = 0;             // Optional
+  pipeline_layout_info.pSetLayouts = nullptr;          // Optional
+  pipeline_layout_info.pushConstantRangeCount = 0;     // Optional
+  pipeline_layout_info.pPushConstantRanges = nullptr;  // Optional
+
+  m_pipeline_layout = m_device->createPipelineLayout(pipeline_layout_info);
+
+  vk::GraphicsPipelineCreateInfo pipeline_info = {};
+  pipeline_info.stageCount = 2;
+  pipeline_info.pStages = shader_stages;
+  pipeline_info.pVertexInputState = &vertex_input_info;
+  pipeline_info.pInputAssemblyState = &input_assembly;
+  pipeline_info.pViewportState = &viewport_state;
+  pipeline_info.pRasterizationState = &rasterizer;
+  pipeline_info.pMultisampleState = &multisampling;
+  pipeline_info.pDepthStencilState = nullptr;
+  pipeline_info.pColorBlendState = &color_blending;
+  pipeline_info.pDynamicState = nullptr;
+  pipeline_info.layout = m_pipeline_layout;
+  pipeline_info.renderPass = m_render_pass;
+  pipeline_info.subpass = 0;
+
+  m_graphics_pipeline =
+      m_device->createGraphicsPipeline(nullptr, pipeline_info);
+
   m_device->destroyShaderModule(vert_shader_module);
   m_device->destroyShaderModule(frag_shader_module);
+}
+
+void Triangle::CreateFramebuffers() {
+  m_swap_chain_framebuffers.resize(m_swap_chain_image_views.size());
+
+  for (size_t i = 0; i < m_swap_chain_image_views.size(); i++) {
+    vk::ImageView attachments[] = {m_swap_chain_image_views[i]};
+
+    vk::FramebufferCreateInfo create_info = {};
+    create_info.renderPass = m_render_pass;
+    create_info.attachmentCount = 1;
+    create_info.pAttachments = attachments;
+    create_info.width = m_swap_chain_details.extent.width;
+    create_info.height = m_swap_chain_details.extent.height;
+    create_info.layers = 1;
+
+    m_swap_chain_framebuffers.push_back(
+        m_device->createFramebuffer(create_info));
+  }
+}
+
+void Triangle::CreateCommandPool() {
+  QueueFamilyIndices queue_family_indices =
+      FindQueueFamilies(*m_physical_device, &m_surface);
+
+  vk::CommandPoolCreateInfo pool_info = {};
+  pool_info.queueFamilyIndex = queue_family_indices.graphics_family.value();
+
+  m_command_pool = m_device->createCommandPool(pool_info);
+}
+
+void Triangle::CreateCommandBuffers() {
+  m_command_buffers.resize(m_swap_chain_framebuffers.size());
+
+  vk::CommandBufferAllocateInfo alloc_info = {};
+  alloc_info.commandPool = m_command_pool;
+  alloc_info.level = vk::CommandBufferLevel::ePrimary;
+  alloc_info.commandBufferCount =
+      static_cast<uint32_t>(m_command_buffers.size());
+
+  m_command_buffers = m_device->allocateCommandBuffers(alloc_info);
+
+  for (size_t i = 0; i < m_command_buffers.size(); i++) {
+    vk::CommandBufferBeginInfo begin_info = {};
+    begin_info.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
+    begin_info.pInheritanceInfo = nullptr;
+
+    m_command_buffers[i].begin(begin_info);
+
+    vk::RenderPassBeginInfo render_pass_info = {};
+    render_pass_info.renderPass = m_render_pass;
+    render_pass_info.framebuffer = m_swap_chain_framebuffers[i];
+    render_pass_info.renderArea.offset = vk::Offset2D{0, 0};
+    render_pass_info.renderArea.extent = m_swap_chain_details.extent;
+
+    std::array<float, 4UL> colors = {0.0f, 0.0f, 0.0f, 1.0f};
+
+    vk::ClearColorValue clear_color = {};
+    clear_color.setFloat32(colors);
+
+    vk::ClearValue clear_value = {};
+    clear_value.color = clear_color;
+
+    render_pass_info.clearValueCount = 1;
+    render_pass_info.pClearValues = &clear_value;
+
+    m_command_buffers[i].beginRenderPass(render_pass_info,
+                                         vk::SubpassContents::eInline);
+    m_command_buffers[i].bindPipeline(vk::PipelineBindPoint::eGraphics,
+                                      m_graphics_pipeline);
+    m_command_buffers[i].draw(3, 1, 0, 0);
+    m_command_buffers[i].endRenderPass();
+  }
+}
+
+void Triangle::CreateSemaphores() {
+  vk::SemaphoreCreateInfo semaphore_info = {};
+  m_render_completed = m_device->createSemaphore(semaphore_info);
+  m_image_avaliable = m_device->createSemaphore(semaphore_info);
 }
 
 void Triangle::MainLoop() {
   while (!glfwWindowShouldClose(m_window)) {
     glfwPollEvents();
+    DrawFrame();
   }
+
+  m_device->waitIdle();
+}
+
+void Triangle::DrawFrame() {
+  uint32_t image_index;
+  image_index = m_device
+                    ->acquireNextImageKHR(m_swap_chain,
+                                          std::numeric_limits<uint64_t>::max(),
+                                          m_image_avaliable, nullptr)
+                    .value;
+
+  vk::SubmitInfo submit_info = {};
+
+  vk::Semaphore wait_semaphores[] = {m_image_avaliable};
+  vk::PipelineStageFlags wait_stages[] = {
+      vk::PipelineStageFlagBits::eColorAttachmentOutput};
+
+  submit_info.waitSemaphoreCount = 1;
+  submit_info.pWaitSemaphores = wait_semaphores;
+  submit_info.pWaitDstStageMask = wait_stages;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &m_command_buffers[image_index];
+
+  vk::Semaphore signal_semaphores[] = {m_render_completed};
+  submit_info.signalSemaphoreCount = 1;
+  submit_info.pSignalSemaphores = signal_semaphores;
+
+  std::cout << "Getting here." << std::endl;
+  m_graphics_queue.submit(submit_info, nullptr);
+
+  vk::PresentInfoKHR present_info = {};
+  present_info.waitSemaphoreCount = 1;
+  present_info.pWaitSemaphores = signal_semaphores;
+
+  vk::SwapchainKHR swap_chains[] = {m_swap_chain};
+  present_info.swapchainCount = 1;
+  present_info.pSwapchains = swap_chains;
+  present_info.pImageIndices = &image_index;
+  present_info.pResults = nullptr;
+
+  m_present_queue.presentKHR(present_info);
 }
 
 Triangle::~Triangle() {
   if (m_device != nullptr) {
+    for (auto framebuffer : m_swap_chain_framebuffers) {
+      m_device->destroyFramebuffer(framebuffer);
+    }
     for (auto image_view : m_swap_chain_image_views) {
       m_device->destroyImageView(image_view);
     }
     m_device->destroySwapchainKHR(m_swap_chain);
+    m_device->destroyPipeline(m_graphics_pipeline);
+    m_device->destroyPipelineLayout(m_pipeline_layout);
+    m_device->destroyRenderPass(m_render_pass);
+    m_device->destroyCommandPool(m_command_pool);
+    m_device->destroySemaphore(m_image_avaliable);
+    m_device->destroySemaphore(m_render_completed);
     m_device->destroy();
   }
   m_instance.destroySurfaceKHR(m_surface);

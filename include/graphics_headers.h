@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
@@ -14,4 +15,4 @@
 #include <string>
 #include <vector>
 
-#define DEV_MODE
+// #define DEV_MODE

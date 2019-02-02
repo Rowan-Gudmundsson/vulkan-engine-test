@@ -15,6 +15,8 @@ int main() {
   } catch (const std::exception& e) {
     std::cout << "Error occurred: " << e.what() << std::endl;
     return EXIT_FAILURE;
+  } catch (...) {
+    std::cout << "Something else was thrown." << std::endl;
   }
 
   return EXIT_SUCCESS;
